@@ -106,8 +106,6 @@ func doServerJob() {
 					fmt.Println(msg, err)
 				}
 			}
-
-			// quando for de HELD pra RELEASED, limpar a requestQueue e zerar o contador de replies
 		} else if strings.Contains(message, "REPLY:") {
 			idxClock := strings.Index(message, "logical clock: ") + len("logical clock: ")
 			msgLogicalClockStr := message[idxClock:]
@@ -126,6 +124,9 @@ func doServerJob() {
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}
+
+		/*quando for de HELD pra RELEASED, limpar a requestQueue e zerar
+		o contador de replies*/
 	}
 }
 
