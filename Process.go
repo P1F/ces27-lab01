@@ -124,8 +124,7 @@ func initConnections() {
 func main() {
 	initConnections()
 	myLogicalClock = 0
-	//O fechamento de conexões deve ficar aqui, assim só fecha
-	//conexão quando a main morrer
+	//O fechamento de conexões deve ficar aqui, assim só fecha conexão quando a main morrer
 	defer ServConn.Close()
 	for _, Conn := range CliConn {
 		defer Conn.Close()
@@ -138,8 +137,7 @@ func main() {
 
 	go doServerJob()
 	for {
-		// Verificar (de forma não bloqueante) se tem algo no
-		// stdin (input do terminal)
+		// Verificar (de forma não bloqueante) se tem algo no stdin (input do terminal)
 		select {
 		case x, valid := <-ch:
 			if valid {
@@ -159,8 +157,7 @@ func main() {
 				fmt.Println("Canal fechado!")
 			}
 		default:
-			// Fazer nada...
-			// Mas não fica bloqueado esperando o teclado
+			// Fazer nada... Mas não fica bloqueado esperando o teclado
 			time.Sleep(time.Second * 1)
 		}
 		// Esperar um pouco
