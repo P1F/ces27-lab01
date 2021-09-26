@@ -17,7 +17,7 @@ var myPort string                   //porta do meu servidor
 var myLogicalClock uint64           //logical clock do meu servidor
 var nServers int                    //qtde de outros processo
 var ports map[int]string            //map com portas de cada id
-var CliConn map[string]*net.UDPConn //map com conexões para os servidores dos outros processos
+var CliConn map[string]*net.UDPConn //map com conexões para os servidores dos outros processos por porta
 var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo
 //mensagens dos outros processos)
 
