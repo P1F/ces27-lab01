@@ -152,7 +152,7 @@ func main() {
 						fmt.Printf("INTERNAL event! Logical clock updated to: %d\n", myLogicalClock)
 					}
 				} else {
-					fmt.Printf("Input '%s' is not valid!\n", x)
+					fmt.Printf("Input '%s' is not a number!\n", x)
 				}
 
 			} else {
