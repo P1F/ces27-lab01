@@ -72,7 +72,8 @@ func doClientJob(otherProcessId int) {
 	// Enviar mensagem para outro processo contendo meu id e logical clock
 	myIdStr := strconv.Itoa(myId)
 	myLogicalClockStr := strconv.FormatUint(myLogicalClock, 10)
-	msg := "id: " + myIdStr + " - logical clock: " + myLogicalClockStr
+	msg := "Hello! Here's my info -> "
+	msg += "id: " + myIdStr + " - logical clock: " + myLogicalClockStr
 	buf := []byte(msg)
 	_, err := CliConn[ports[otherProcessId]].Write(buf)
 	if err != nil {
