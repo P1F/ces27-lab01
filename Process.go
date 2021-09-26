@@ -58,7 +58,7 @@ func doServerJob() {
 		//Escrever na tela a msg recebida (indicando o endereço de quem enviou)
 		message := string(buf[0:n])
 		fmt.Println("Received ", message, " from ", addr)
-		idx := strings.Index(message, "logical clock:") + len("logical clock:")
+		idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
 		msgLogicalClock, _ := strconv.ParseUint(message[idx:], 10, 64)
 		myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
 		if err != nil {
