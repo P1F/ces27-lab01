@@ -19,7 +19,12 @@ var nServers int                    //qtde de outros processo
 var ports map[int]string            //map com portas de cada id
 var CliConn map[string]*net.UDPConn //map com conexões para os servidores dos outros processos por porta
 var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo mensagens dos outros processos)
-const sharedResourceId int = 0      //define um id para o SharedResource
+var myState string                  //define o estado do processo
+
+const sharedResourceId int = 0 //define um id para o SharedResource
+const RELEASED string = "RELEASED"
+const WANTED string = "WANTED"
+const HELD string = "HELD"
 
 func CheckError(err error) {
 	if err != nil {
@@ -97,6 +102,7 @@ func doClientJob(otherProcessId int) {
 
 	if otherProcessId == sharedResourceId {
 		//avisar outros processos que quero acessar a CS
+		myState = WANTED
 		broadcastMsg := "Process [" + myIdStr + "] WANTs to enter CS! "
 		broadcastMsg += "Logical clock: " + myLogicalClockStr
 		buf2 := []byte(broadcastMsg)
@@ -129,6 +135,7 @@ func initConnections() {
 
 	myId, _ = strconv.Atoi(os.Args[1])
 	myPort = ports[myId]
+	myState = RELEASED
 	nServers = len(os.Args) - 2
 	//Esse 2 tira o nome (no caso Process) e o meu id. As demais portas são dos outros processos
 
@@ -141,16 +148,26 @@ func initConnections() {
 	ServConn, err = net.ListenUDP("udp", ServerAddr)
 	CheckError(err)
 
+	/*Outros códigos para deixar ok a conexão com o servidor do SharedResource.
+	Colocar tais conexões no map CliConn.*/
+	SharedResourcesAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:10001")
+	CheckError(err)
+	SharedResourcesConn, err := net.DialUDP("udp", nil, SharedResourcesAddr)
+	CliConn[":10001"] = SharedResourcesConn
+	CheckError(err)
+
 	/*Outros códigos para deixar ok as conexões com os servidores dos outros processos.
 	Colocar tais conexões no map CliConn.*/
 	for servidores := 0; servidores < nServers; servidores++ {
 		port := os.Args[2+servidores]
-		ServerAddr, err := net.ResolveUDPAddr("udp",
-			"127.0.0.1"+port)
-		CheckError(err)
-		Conn, err := net.DialUDP("udp", nil, ServerAddr)
-		CliConn[port] = Conn
-		CheckError(err)
+		if port != ":10001" {
+			ServerAddr, err := net.ResolveUDPAddr("udp",
+				"127.0.0.1"+port)
+			CheckError(err)
+			Conn, err := net.DialUDP("udp", nil, ServerAddr)
+			CliConn[port] = Conn
+			CheckError(err)
+		}
 	}
 }
 
