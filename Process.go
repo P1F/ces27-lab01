@@ -84,15 +84,16 @@ func doClientJob(otherProcessId int) {
 
 func initConnections() {
 	ports = map[int]string{
-		1: ":10001",
-		2: ":10002",
-		3: ":10003",
-		4: ":10004",
-		5: ":10005",
-		6: ":10006",
-		7: ":10007",
-		8: ":10008",
-		9: ":10009",
+		0: ":10001", // porta fixa: utilizada para o SharedResource
+		1: ":10002",
+		2: ":10003",
+		3: ":10004",
+		4: ":10005",
+		5: ":10006",
+		6: ":10007",
+		7: ":10008",
+		8: ":10009",
+		9: ":10010",
 	}
 
 	myId, _ = strconv.Atoi(os.Args[1])
