@@ -23,14 +23,14 @@ var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo
 
 func CheckError(err error) {
 	if err != nil {
-		fmt.Println("Erro: ", err)
+		fmt.Println("Erro:", err)
 		os.Exit(0)
 	}
 }
 
 func PrintError(err error) {
 	if err != nil {
-		fmt.Println("Erro: ", err)
+		fmt.Println("Erro:", err)
 	}
 }
 
@@ -57,7 +57,7 @@ func doServerJob() {
 		n, addr, err := ServConn.ReadFromUDP(buf)
 		//Escrever na tela a msg recebida (indicando o endereço de quem enviou)
 		message := string(buf[0:n])
-		fmt.Println("Received ", message, " from ", addr)
+		fmt.Println("Received", message, "from", addr)
 		idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
 		msgLogicalClock, _ := strconv.ParseUint(message[idx:], 10, 64)
 		myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
