@@ -57,10 +57,11 @@ func doServerJob() {
 		n, addr, err := ServConn.ReadFromUDP(buf)
 		//Escrever na tela a msg recebida (indicando o endereço de quem enviou)
 		message := string(buf[0:n])
-		fmt.Println("Received", message, "from", addr)
+		fmt.Printf("Received message '%s' from %s\n", message, addr)
 		idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
 		msgLogicalClock, _ := strconv.ParseUint(message[idx:], 10, 64)
 		myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
+		fmt.Printf("Logical clock updated to: %d\n", myLogicalClock)
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}
@@ -130,7 +131,7 @@ func main() {
 		defer Conn.Close()
 	}
 
-	fmt.Println("Meu id:", myId, "- Minha porta:", myPort)
+	fmt.Printf("Process [%d] started at port %s\n", myId, myPort)
 
 	ch := make(chan string) //canal que guarda itens lidos do teclado
 	go readInput(ch)        //chamar rotina que ”escuta” o teclado
@@ -141,20 +142,21 @@ func main() {
 		select {
 		case x, valid := <-ch:
 			if valid {
-				fmt.Printf("Recebi do teclado: %s \n", x)
+				fmt.Printf("Input received from keyboard: %s\n", x)
 				id, erro := strconv.Atoi(x)
 				if erro == nil {
 					if id != myId {
 						go doClientJob(id)
 					} else {
 						myLogicalClock++
+						fmt.Printf("INTERNAL event! Logical clock updated to: %d\n", myLogicalClock)
 					}
 				} else {
-					fmt.Println("Entrada inválida!")
+					fmt.Printf("Input '%s' is not valid!\n", x)
 				}
 
 			} else {
-				fmt.Println("Canal fechado!")
+				fmt.Println("Channel CLOSED!")
 			}
 		default:
 			// Fazer nada... Mas não fica bloqueado esperando o teclado
