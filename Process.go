@@ -21,6 +21,7 @@ var CliConn map[string]*net.UDPConn //map com conexões para os servidores dos o
 var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo mensagens dos outros processos)
 var myState string                  //define o estado do processo
 var requestQueue []int              //define a fila para guardar requests
+var repliesCount int                //define um contador de replies
 const sharedResourceId int = 0      //define um id fixo para o SharedResource
 
 const RELEASED string = "RELEASED"
@@ -79,7 +80,8 @@ func doServerJob() {
 			otherId, _ := strconv.Atoi(otherIdStr)
 			otherLogicalClock, _ := strconv.ParseUint(otherLogicalClockStr, 10, 64)
 
-			fmt.Printf("Recebi pedido de entrada na CS -> id: %s, logical clock: %s\n", otherIdStr, otherLogicalClockStr)
+			myLogicalClock = Max(myLogicalClock, otherLogicalClock) + 1
+			fmt.Printf("REQUEST RECEBIDO! Logical clock updated to: %d\n", myLogicalClock)
 
 			isMyPreference := false
 			if myState == WANTED {
@@ -96,7 +98,8 @@ func doServerJob() {
 			} else {
 				//dar reply para otherId
 				fmt.Println("reply immediatly")
-				msg := "REPLY: reply from " + strconv.Itoa(myId)
+				msg := "REPLY: reply from [" + strconv.Itoa(myId) + "] - "
+				msg += "logical clock: " + strconv.FormatUint(myLogicalClock, 10)
 				buf := []byte(msg)
 				_, err := CliConn[ports[otherId]].Write(buf)
 				if err != nil {
@@ -105,12 +108,19 @@ func doServerJob() {
 			}
 
 			// quando for de HELD pra RELEASED, limpar a requestQueue e zerar o contador de replies
+		} else if strings.Contains(message, "REPLY:") {
+			idxClock := strings.Index(message, "logical clock: ") + len("logical clock: ")
+			msgLogicalClockStr := message[idxClock:]
+			msgLogicalClock, _ := strconv.ParseUint(msgLogicalClockStr, 10, 64)
+			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
+			repliesCount++
+			fmt.Printf("REPLY RECEBIDO! Logical clock updated to: %d\n", myLogicalClock)
 		} else {
 			//recebeu uma mensagem qualquer de um processo
 			idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
 			msgLogicalClock, _ := strconv.ParseUint(message[idx:], 10, 64)
 			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
-			fmt.Printf("Logical clock updated to: %d\n", myLogicalClock)
+			fmt.Printf("MENSAGEM RECEBIDA! Logical clock updated to: %d\n", myLogicalClock)
 		}
 
 		if err != nil {
@@ -133,7 +143,10 @@ func doClientJob(otherProcessId int) {
 	if otherProcessId == sharedResourceId && myState == RELEASED {
 		//avisar outros processos que quero acessar a CS
 		myState = WANTED
+		repliesCount = 0
+		requestQueue = nil
 		myLogicalClock++
+		fmt.Printf("REQUEST ENVIADO! Logical clock updated to: %d\n", myLogicalClock)
 		broadcastMsg := "REQUEST: Process [" + myIdStr + "] WANTs to enter CS! "
 		broadcastMsg += "Logical clock: " + strconv.FormatUint(myLogicalClock, 10)
 		buf2 := []byte(broadcastMsg)
@@ -163,6 +176,8 @@ func initConnections() {
 		8: ":10009",
 		9: ":10010",
 	}
+	repliesCount = 0
+	requestQueue = nil
 
 	myId, _ = strconv.Atoi(os.Args[1])
 	myPort = ports[myId]
