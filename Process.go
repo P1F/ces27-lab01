@@ -18,8 +18,8 @@ var myLogicalClock uint64           //logical clock do meu servidor
 var nServers int                    //qtde de outros processo
 var ports map[int]string            //map com portas de cada id
 var CliConn map[string]*net.UDPConn //map com conexões para os servidores dos outros processos por porta
-var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo
-//mensagens dos outros processos)
+var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo mensagens dos outros processos)
+const sharedResourceId int = 0      //define um id para o SharedResource
 
 func CheckError(err error) {
 	if err != nil {
@@ -58,10 +58,23 @@ func doServerJob() {
 		//Escrever na tela a msg recebida (indicando o endereço de quem enviou)
 		message := string(buf[0:n])
 		fmt.Printf("Received message '%s' from %s\n", message, addr)
-		idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
-		msgLogicalClock, _ := strconv.ParseUint(message[idx:], 10, 64)
-		myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
-		fmt.Printf("Logical clock updated to: %d\n", myLogicalClock)
+
+		// TODO filtrar entrada WANT no input do usuário
+		if strings.Contains(message, "WANT") { //yes, this can be a problem...
+			idxId := strings.Index(message, "[")
+			idxClock := strings.Index(message, "Logical clock: ") + len("Logical clock: ")
+
+			idStr := message[idxId+1 : idxId+2]
+			logicalClockStr := message[idxClock:]
+
+			fmt.Printf("Recebi pedido de entrada na CS -> id: %s, logical clock: %s\n", idStr, logicalClockStr)
+		} else {
+			idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
+			msgLogicalClock, _ := strconv.ParseUint(message[idx:], 10, 64)
+			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
+			fmt.Printf("Logical clock updated to: %d\n", myLogicalClock)
+		}
+
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}
@@ -78,6 +91,21 @@ func doClientJob(otherProcessId int) {
 	_, err := CliConn[ports[otherProcessId]].Write(buf)
 	if err != nil {
 		fmt.Println(msg, err)
+	}
+
+	if otherProcessId == sharedResourceId {
+		//avisar outros processos que quero acessar a CS
+		broadcastMsg := "Process [" + myIdStr + "] WANTs to enter CS! "
+		broadcastMsg += "Logical clock: " + myLogicalClockStr
+		buf2 := []byte(broadcastMsg)
+		for port, Conn := range CliConn {
+			if port != ports[sharedResourceId] && port != ports[myId] {
+				_, err := Conn.Write(buf2)
+				if err != nil {
+					fmt.Println(broadcastMsg, err)
+				}
+			}
+		}
 	}
 
 	time.Sleep(time.Second * 1)
@@ -147,7 +175,7 @@ func main() {
 				fmt.Printf("Input received from keyboard: %s\n", x)
 				id, erro := strconv.Atoi(x)
 				if erro == nil {
-					if id != myId {
+					if id != myId { // chame rotina para envio de mensagens
 						go doClientJob(id)
 					} else {
 						myLogicalClock++
@@ -156,7 +184,6 @@ func main() {
 				} else {
 					fmt.Printf("Input '%s' is not a number!\n", x)
 				}
-
 			} else {
 				fmt.Println("Channel CLOSED!")
 			}
