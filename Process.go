@@ -109,7 +109,7 @@ func initConnections() {
 	CheckError(err)
 
 	/*Outros códigos para deixar ok as conexões com os servidores dos outros processos.
-	Colocar tais conexões no vetor CliConn.*/
+	Colocar tais conexões no map CliConn.*/
 	for servidores := 0; servidores < nServers; servidores++ {
 		port := os.Args[2+servidores]
 		ServerAddr, err := net.ResolveUDPAddr("udp",
