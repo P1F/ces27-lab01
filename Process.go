@@ -61,6 +61,7 @@ func doServerJob() {
 
 		// TODO filtrar entrada WANT no input do usuário
 		if strings.Contains(message, "WANT") { //yes, this can be a problem...
+			//recebeu request que algum processo quer entrar na CS
 			idxId := strings.Index(message, "[")
 			idxClock := strings.Index(message, "Logical clock: ") + len("Logical clock: ")
 
@@ -69,6 +70,7 @@ func doServerJob() {
 
 			fmt.Printf("Recebi pedido de entrada na CS -> id: %s, logical clock: %s\n", idStr, logicalClockStr)
 		} else {
+			//recebeu uma mensagem qualquer de um processo
 			idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
 			msgLogicalClock, _ := strconv.ParseUint(message[idx:], 10, 64)
 			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
