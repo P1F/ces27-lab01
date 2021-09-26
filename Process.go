@@ -102,7 +102,6 @@ func doServerJob() {
 				if err != nil {
 					fmt.Println(msg, err)
 				}
-
 			}
 
 			// quando for de HELD pra RELEASED, limpar a requestQueue e zerar o contador de replies
@@ -123,9 +122,8 @@ func doServerJob() {
 func doClientJob(otherProcessId int) {
 	// Enviar mensagem para outro processo contendo meu id e logical clock
 	myIdStr := strconv.Itoa(myId)
-	myLogicalClockStr := strconv.FormatUint(myLogicalClock, 10)
 	msg := "Hello! Here's my info -> "
-	msg += "id: " + myIdStr + " - logical clock: " + myLogicalClockStr
+	msg += "id: " + myIdStr + " - logical clock: " + strconv.FormatUint(myLogicalClock, 10)
 	buf := []byte(msg)
 	_, err := CliConn[ports[otherProcessId]].Write(buf)
 	if err != nil {
@@ -135,8 +133,9 @@ func doClientJob(otherProcessId int) {
 	if otherProcessId == sharedResourceId && myState == RELEASED {
 		//avisar outros processos que quero acessar a CS
 		myState = WANTED
+		myLogicalClock++
 		broadcastMsg := "REQUEST: Process [" + myIdStr + "] WANTs to enter CS! "
-		broadcastMsg += "Logical clock: " + myLogicalClockStr
+		broadcastMsg += "Logical clock: " + strconv.FormatUint(myLogicalClock, 10)
 		buf2 := []byte(broadcastMsg)
 		for port, Conn := range CliConn {
 			if port != ports[sharedResourceId] && port != ports[myId] {
