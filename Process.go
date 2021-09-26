@@ -20,6 +20,7 @@ var ports map[int]string            //map com portas de cada id
 var CliConn map[string]*net.UDPConn //map com conexões para os servidores dos outros processos por porta
 var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo mensagens dos outros processos)
 var myState string                  //define o estado do processo
+var requestQueue []int              //define a fila para guardar requests
 const sharedResourceId int = 0      //define um id fixo para o SharedResource
 
 const RELEASED string = "RELEASED"
@@ -89,14 +90,22 @@ func doServerJob() {
 			}
 
 			if myState == HELD || isMyPreference {
+				//enfileirar o request de otherId sem dar reply
 				fmt.Println("queue request")
-				//queue request from pi withou replying
+				requestQueue = append(requestQueue, otherId)
 			} else {
-				//reply immediatly to pi
+				//dar reply para otherId
 				fmt.Println("reply immediatly")
-				//chamar DIAL e dar reply
+				msg := "REPLY: reply from " + strconv.Itoa(myId)
+				buf := []byte(msg)
+				_, err := CliConn[ports[otherId]].Write(buf)
+				if err != nil {
+					fmt.Println(msg, err)
+				}
+
 			}
 
+			// quando for de HELD pra RELEASED, limpar a requestQueue e zerar o contador de replies
 		} else {
 			//recebeu uma mensagem qualquer de um processo
 			idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
