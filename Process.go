@@ -96,9 +96,11 @@ func initConnections() {
 	myPort = ports[myId]
 	nServers = len(os.Args) - 2
 	//Esse 2 tira o nome (no caso Process) e o meu id. As demais portas são dos outros processos
+
+	CliConn = make(map[string]*net.UDPConn)
+
 	/*Outros códigos para deixar ok a conexão do meu servidor (onde recebo msgs).
 	O processo já deve ficar habilitado a receber msgs.*/
-
 	ServerAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1"+myPort)
 	CheckError(err)
 	ServConn, err = net.ListenUDP("udp", ServerAddr)
@@ -112,22 +114,22 @@ func initConnections() {
 			"127.0.0.1"+port)
 		CheckError(err)
 		Conn, err := net.DialUDP("udp", nil, ServerAddr)
+		CliConn[port] = Conn
 		CheckError(err)
-		CliConn = map[string]*net.UDPConn{
-			port: Conn,
-		}
 	}
 }
 
 func main() {
 	initConnections()
+	myLogicalClock = 0
 	//O fechamento de conexões deve ficar aqui, assim só fecha
 	//conexão quando a main morrer
 	defer ServConn.Close()
-	for _, port := range ports {
-		fmt.Println(port)
-		//defer CliConn[port].Close()
+	for _, Conn := range CliConn {
+		defer Conn.Close()
 	}
+
+	fmt.Println("Meu id:", myId, "- Minha porta:", myPort)
 
 	ch := make(chan string) //canal que guarda itens lidos do teclado
 	go readInput(ch)        //chamar rotina que ”escuta” o teclado
@@ -140,9 +142,13 @@ func main() {
 		case x, valid := <-ch:
 			if valid {
 				fmt.Printf("Recebi do teclado: %s \n", x)
-				x_int, erro := strconv.Atoi(x)
+				id, erro := strconv.Atoi(x)
 				if erro == nil {
-					go doClientJob(x_int)
+					if id != myId {
+						go doClientJob(id)
+					} else {
+						myLogicalClock++
+					}
 				} else {
 					fmt.Println("Entrada inválida!")
 				}
