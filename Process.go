@@ -20,8 +20,8 @@ var ports map[int]string            //map com portas de cada id
 var CliConn map[string]*net.UDPConn //map com conexões para os servidores dos outros processos por porta
 var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo mensagens dos outros processos)
 var myState string                  //define o estado do processo
+const sharedResourceId int = 0      //define um id fixo para o SharedResource
 
-const sharedResourceId int = 0 //define um id para o SharedResource
 const RELEASED string = "RELEASED"
 const WANTED string = "WANTED"
 const HELD string = "HELD"
