@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
-	"strings"
 )
 
 func CheckError(err error) {
@@ -41,14 +39,6 @@ func main() {
 		//Escrever na tela a msg recebida (indicando o endereço de quem enviou)
 		message := string(buf[0:n])
 		fmt.Printf("Received message '%s' from %s\n", message, addr)
-
-		idxId := strings.Index(message, "id: ") + len("id: ")
-		idxClock := strings.Index(message, "logical clock: ") + len("logical clock: ")
-
-		id, _ := strconv.Atoi(message[idxId:idxClock])
-		logicalClock, _ := strconv.ParseUint(message[idxClock:], 10, 64)
-
-		fmt.Printf("received -> id: %d - logical clock: %d\n", id, logicalClock)
 
 		if err != nil {
 			fmt.Println("Error: ", err)
