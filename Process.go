@@ -183,7 +183,7 @@ func doServerJob(mutex *sync.Mutex) {
 			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
 			myRepliesCount++
 			mutex.Unlock()
-			fmt.Printf("REPLY %d RECEBIDO de %d! Logical clock updated to: %d\n", myRepliesCount, otherId, myLogicalClock)
+			fmt.Printf("REPLY %d/%d RECEBIDO do id [%d]! Logical clock updated to: %d\n", myRepliesCount, nServers, otherId, myLogicalClock)
 
 			if myRepliesCount == nServers-1 {
 				go accessCS(mutex)
