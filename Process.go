@@ -30,9 +30,6 @@ const sharedResourceId int = 0      //define um id fixo para o SharedResource
 const RELEASED string = "RELEASED"
 const WANTED string = "WANTED"
 const HELD string = "HELD"
-const MESSAGE string = "message"
-const REQUEST string = "request"
-const REPLY string = "reply"
 
 func CheckError(err error) {
 	if err != nil {
