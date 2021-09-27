@@ -71,7 +71,7 @@ func accessCS(mutex *sync.Mutex) {
 	myIdStr := strconv.Itoa(myId)
 
 	//enviar mensagem para Shared Resource
-	msg := "Message received from id [" + myIdStr + "] -> "
+	msg := "id [" + myIdStr + "] -> "
 	msg += "msg: " + myRequestMessage + " - logical clock: " + strconv.FormatUint(myLogicalClock, 10)
 	buf := []byte(msg)
 	_, err := CliConn[ports[sharedResourceId]].Write(buf)
