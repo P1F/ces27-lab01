@@ -64,13 +64,17 @@ func readInput(ch chan string) {
 func accessCS(mutex *sync.Mutex) {
 	fmt.Println("Entrei na CS")
 	//entrar na CS -> trocar estado para HELD
+	mutex.Lock()
 	myState = HELD
+	mutex.Unlock()
 	fmt.Println("Agora estou em HELD")
 	//dormir por 2s (só para simular quando sair da CS)
 	time.Sleep(time.Second * 60)
 
 	//sair da CS -> trocar estado para RELEASED
+	mutex.Lock()
 	myState = RELEASED
+	mutex.Unlock()
 	fmt.Println("Agora estou em RELEASED")
 	fmt.Println("Saí da CS")
 
@@ -90,8 +94,10 @@ func accessCS(mutex *sync.Mutex) {
 	fmt.Println("REPLY enviado para ", myRequestQueue)
 
 	//talvez não seja necessário, mas foi colocado por precaução
+	mutex.Lock()
 	myRepliesCount = 0
 	myRequestQueue = nil
+	mutex.Unlock()
 }
 
 func doServerJob(mutex *sync.Mutex) {
@@ -113,7 +119,9 @@ func doServerJob(mutex *sync.Mutex) {
 			otherId, _ := strconv.Atoi(otherIdStr)
 			otherLogicalClock, _ := strconv.ParseUint(otherLogicalClockStr, 10, 64)
 
+			mutex.Lock()
 			myLogicalClock = Max(myLogicalClock, otherLogicalClock) + 1
+			mutex.Unlock()
 			fmt.Printf("REQUEST RECEBIDO de [%d]! Logical clock updated to: %d\n", otherId, myLogicalClock)
 
 			isMyPreference := false
@@ -127,7 +135,9 @@ func doServerJob(mutex *sync.Mutex) {
 			if myState == HELD || isMyPreference {
 				//enfileirar o request de otherId sem dar reply
 				fmt.Printf("Enfileirando %d...\n", otherId)
+				mutex.Lock()
 				myRequestQueue = append(myRequestQueue, otherId)
+				mutex.Unlock()
 				fmt.Println("Status da fila:", myRequestQueue)
 			} else {
 				//dar reply para otherId
@@ -152,9 +162,10 @@ func doServerJob(mutex *sync.Mutex) {
 			idxClock := strings.Index(message, "logical clock: ") + len("logical clock: ")
 			msgLogicalClockStr := message[idxClock:]
 			msgLogicalClock, _ := strconv.ParseUint(msgLogicalClockStr, 10, 64)
+			mutex.Lock()
 			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
-
 			myRepliesCount++
+			mutex.Unlock()
 			fmt.Printf("REPLY %d RECEBIDO de %d! Logical clock updated to: %d\n", myRepliesCount, otherId, myLogicalClock)
 
 			if myRepliesCount == nServers-1 {
@@ -164,7 +175,9 @@ func doServerJob(mutex *sync.Mutex) {
 			//recebeu uma mensagem qualquer de um processo
 			idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
 			msgLogicalClock, _ := strconv.ParseUint(message[idx:], 10, 64)
+			mutex.Lock()
 			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
+			mutex.Unlock()
 			fmt.Printf("MENSAGEM RECEBIDA! Logical clock updated to: %d\n", myLogicalClock)
 		}
 
@@ -190,11 +203,13 @@ func doClientJob(otherProcessId int, mutex *sync.Mutex) {
 
 	if otherProcessId == sharedResourceId && myState == RELEASED {
 		//avisar outros processos que quero acessar a CS
+		mutex.Lock()
 		myState = WANTED
-		fmt.Println("Agora estou em WANTED")
 		myRepliesCount = 0
 		myRequestQueue = nil
 		myLogicalClock++
+		mutex.Unlock()
+		fmt.Println("Agora estou em WANTED")
 		broadcastMsg := "REQUEST: Process [" + myIdStr + "] WANTs to enter CS! "
 		broadcastMsg += "Logical clock: " + strconv.FormatUint(myLogicalClock, 10)
 		buf2 := []byte(broadcastMsg)
@@ -212,7 +227,7 @@ func doClientJob(otherProcessId int, mutex *sync.Mutex) {
 	time.Sleep(time.Second * 1)
 }
 
-func initConnections(mutex *sync.Mutex) {
+func initConnections() {
 	ports = map[int]string{
 		0: ":10001", // porta fixa: utilizada para o SharedResource
 		1: ":10002",
@@ -268,7 +283,7 @@ func initConnections(mutex *sync.Mutex) {
 
 func main() {
 	var mutex sync.Mutex
-	initConnections(&mutex)
+	initConnections()
 	//O fechamento de conexões deve ficar aqui, assim só fecha conexão quando a main morrer
 	defer ServConn.Close()
 	for _, Conn := range CliConn {
@@ -297,6 +312,9 @@ func main() {
 					}
 				} else {
 					fmt.Printf("Input '%s' is not a number!\n", x)
+					if x == "clock" {
+						fmt.Printf("myClock -> %d\n", myLogicalClock)
+					}
 				}
 			} else {
 				fmt.Println("Channel CLOSED!")
