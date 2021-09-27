@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -20,8 +21,8 @@ var ports map[int]string            //map com portas de cada id
 var CliConn map[string]*net.UDPConn //map com conexões para os servidores dos outros processos por porta
 var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo mensagens dos outros processos)
 var myState string                  //define o estado do processo
-var requestQueue []int              //define a fila para guardar requests
-var repliesCount int                //define um contador de replies
+var myRequestQueue []int            //define a fila para guardar requests
+var myRepliesCount int              //define um contador de replies
 const sharedResourceId int = 0      //define um id fixo para o SharedResource
 
 const RELEASED string = "RELEASED"
@@ -60,7 +61,7 @@ func readInput(ch chan string) {
 	}
 }
 
-func accessCS() {
+func accessCS(mutex *sync.Mutex) {
 	fmt.Println("Entrei na CS")
 	//entrar na CS -> trocar estado para HELD
 	myState = HELD
@@ -79,21 +80,21 @@ func accessCS() {
 	buf := []byte(msg)
 
 	//dar reply para todos os processos com requests enfileirados
-	for _, id := range requestQueue {
+	for _, id := range myRequestQueue {
 		_, err := CliConn[ports[id]].Write(buf)
 		if err != nil {
 			fmt.Println(msg, err)
 		}
 	}
 
-	fmt.Println("REPLY enviado para ", requestQueue)
+	fmt.Println("REPLY enviado para ", myRequestQueue)
 
 	//talvez não seja necessário, mas foi colocado por precaução
-	repliesCount = 0
-	requestQueue = nil
+	myRepliesCount = 0
+	myRequestQueue = nil
 }
 
-func doServerJob() {
+func doServerJob(mutex *sync.Mutex) {
 	buf := make([]byte, 1024)
 	for {
 		//Ler (uma vez somente) da conexão UDP a mensagem
@@ -126,8 +127,8 @@ func doServerJob() {
 			if myState == HELD || isMyPreference {
 				//enfileirar o request de otherId sem dar reply
 				fmt.Printf("Enfileirando %d...\n", otherId)
-				requestQueue = append(requestQueue, otherId)
-				fmt.Println("Status da fila:", requestQueue)
+				myRequestQueue = append(myRequestQueue, otherId)
+				fmt.Println("Status da fila:", myRequestQueue)
 			} else {
 				//dar reply para otherId
 				fmt.Println("Não tenho preferência...")
@@ -153,11 +154,11 @@ func doServerJob() {
 			msgLogicalClock, _ := strconv.ParseUint(msgLogicalClockStr, 10, 64)
 			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
 
-			repliesCount++
-			fmt.Printf("REPLY %d RECEBIDO de %d! Logical clock updated to: %d\n", repliesCount, otherId, myLogicalClock)
+			myRepliesCount++
+			fmt.Printf("REPLY %d RECEBIDO de %d! Logical clock updated to: %d\n", myRepliesCount, otherId, myLogicalClock)
 
-			if repliesCount == nServers-1 {
-				go accessCS()
+			if myRepliesCount == nServers-1 {
+				go accessCS(mutex)
 			}
 		} else {
 			//recebeu uma mensagem qualquer de um processo
@@ -171,12 +172,12 @@ func doServerJob() {
 			fmt.Println("Error: ", err)
 		}
 
-		/*quando for de HELD pra RELEASED, limpar a requestQueue e zerar
+		/*quando for de HELD pra RELEASED, limpar a myRequestQueue e zerar
 		o contador de replies*/
 	}
 }
 
-func doClientJob(otherProcessId int) {
+func doClientJob(otherProcessId int, mutex *sync.Mutex) {
 	// Enviar mensagem para outro processo contendo meu id e logical clock
 	myIdStr := strconv.Itoa(myId)
 	msg := "Hello! Here's my info -> "
@@ -191,8 +192,8 @@ func doClientJob(otherProcessId int) {
 		//avisar outros processos que quero acessar a CS
 		myState = WANTED
 		fmt.Println("Agora estou em WANTED")
-		repliesCount = 0
-		requestQueue = nil
+		myRepliesCount = 0
+		myRequestQueue = nil
 		myLogicalClock++
 		broadcastMsg := "REQUEST: Process [" + myIdStr + "] WANTs to enter CS! "
 		broadcastMsg += "Logical clock: " + strconv.FormatUint(myLogicalClock, 10)
@@ -211,7 +212,7 @@ func doClientJob(otherProcessId int) {
 	time.Sleep(time.Second * 1)
 }
 
-func initConnections() {
+func initConnections(mutex *sync.Mutex) {
 	ports = map[int]string{
 		0: ":10001", // porta fixa: utilizada para o SharedResource
 		1: ":10002",
@@ -224,11 +225,11 @@ func initConnections() {
 		8: ":10009",
 		9: ":10010",
 	}
-	repliesCount = 0
-	requestQueue = nil
-
 	myId, _ = strconv.Atoi(os.Args[1])
 	myPort = ports[myId]
+	myLogicalClock = 0
+	myRepliesCount = 0
+	myRequestQueue = nil
 	myState = RELEASED
 	nServers = len(os.Args) - 2
 	//Esse 2 tira o nome (no caso Process) e o meu id. As demais portas são dos outros processos
@@ -266,8 +267,8 @@ func initConnections() {
 }
 
 func main() {
-	initConnections()
-	myLogicalClock = 0
+	var mutex sync.Mutex
+	initConnections(&mutex)
 	//O fechamento de conexões deve ficar aqui, assim só fecha conexão quando a main morrer
 	defer ServConn.Close()
 	for _, Conn := range CliConn {
@@ -279,7 +280,7 @@ func main() {
 	ch := make(chan string) //canal que guarda itens lidos do teclado
 	go readInput(ch)        //chamar rotina que ”escuta” o teclado
 
-	go doServerJob()
+	go doServerJob(&mutex)
 	for {
 		// Verificar (de forma não bloqueante) se tem algo no stdin (input do terminal)
 		select {
@@ -289,7 +290,7 @@ func main() {
 				id, erro := strconv.Atoi(x)
 				if erro == nil {
 					if id != myId { // chame rotina para envio de mensagens
-						go doClientJob(id)
+						go doClientJob(id, &mutex)
 					} else {
 						myLogicalClock++
 						fmt.Printf("INTERNAL event! Logical clock updated to: %d\n", myLogicalClock)
