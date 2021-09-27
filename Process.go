@@ -90,20 +90,23 @@ func accessCS(mutex *sync.Mutex) {
 	fmt.Println("Saí da CS")
 	fmt.Println("Agora estou em RELEASED")
 
-	//preparar mensagem de reply
-	msg2 := "REPLY: reply from [" + myIdStr + "] - "
-	msg2 += "logical clock: " + strconv.FormatUint(myLogicalClock, 10)
-	buf2 := []byte(msg2)
+	if len(myRequestQueue) != 0 { //reply para todos os processos na fila
+		//preparar mensagem de reply
+		msg2 := "REPLY: reply from [" + myIdStr + "] - "
+		msg2 += "logical clock: " + strconv.FormatUint(myLogicalClock, 10)
+		buf2 := []byte(msg2)
 
-	//dar reply para todos os processos com requests enfileirados
-	for _, id := range myRequestQueue {
-		_, err := CliConn[ports[id]].Write(buf2)
-		if err != nil {
-			fmt.Println(msg2, err)
+		//dar reply para todos os processos com requests enfileirados
+		for _, id := range myRequestQueue {
+			_, err := CliConn[ports[id]].Write(buf2)
+			if err != nil {
+				fmt.Println(msg2, err)
+			}
 		}
+		fmt.Println("REPLY enviado para ", myRequestQueue)
+	} else {
+		fmt.Println("Fila vazia! Não enviarei replies")
 	}
-
-	fmt.Println("REPLY enviado para ", myRequestQueue)
 
 	//talvez não seja necessário, mas foi colocado por precaução
 	mutex.Lock()
