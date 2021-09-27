@@ -60,14 +60,46 @@ func readInput(ch chan string) {
 	}
 }
 
+func accessCS() {
+	fmt.Println("Entrei na CS")
+	//entrar na CS -> trocar estado para HELD
+	myState = HELD
+	fmt.Println("Agora estou em HELD")
+	//dormir por 2s (só para simular quando sair da CS)
+	time.Sleep(time.Second * 60)
+
+	//sair da CS -> trocar estado para RELEASED
+	myState = RELEASED
+	fmt.Println("Agora estou em RELEASED")
+	fmt.Println("Saí da CS")
+
+	//preparar mensagem de reply
+	msg := "REPLY: reply from [" + strconv.Itoa(myId) + "] - "
+	msg += "logical clock: " + strconv.FormatUint(myLogicalClock, 10)
+	buf := []byte(msg)
+
+	//dar reply para todos os processos com requests enfileirados
+	for _, id := range requestQueue {
+		_, err := CliConn[ports[id]].Write(buf)
+		if err != nil {
+			fmt.Println(msg, err)
+		}
+	}
+
+	fmt.Println("REPLY enviado para ", requestQueue)
+
+	//talvez não seja necessário, mas foi colocado por precaução
+	repliesCount = 0
+	requestQueue = nil
+}
+
 func doServerJob() {
 	buf := make([]byte, 1024)
 	for {
 		//Ler (uma vez somente) da conexão UDP a mensagem
-		n, addr, err := ServConn.ReadFromUDP(buf)
+		n, _, err := ServConn.ReadFromUDP(buf)
 		//Escrever na tela a msg recebida (indicando o endereço de quem enviou)
 		message := string(buf[0:n])
-		fmt.Printf("Received message '%s' from %s\n", message, addr)
 
 		// TODO filtrar entrada WANT no input do usuário
 		if strings.Contains(message, "REQUEST:") && strings.Contains(message, "WANT") { //yes, this can be a problem...
@@ -81,7 +113,7 @@ func doServerJob() {
 			otherLogicalClock, _ := strconv.ParseUint(otherLogicalClockStr, 10, 64)
 
 			myLogicalClock = Max(myLogicalClock, otherLogicalClock) + 1
-			fmt.Printf("REQUEST RECEBIDO! Logical clock updated to: %d\n", myLogicalClock)
+			fmt.Printf("REQUEST RECEBIDO de [%d]! Logical clock updated to: %d\n", otherId, myLogicalClock)
 
 			isMyPreference := false
 			if myState == WANTED {
@@ -93,11 +125,12 @@ func doServerJob() {
 
 			if myState == HELD || isMyPreference {
 				//enfileirar o request de otherId sem dar reply
-				fmt.Println("queue request")
+				fmt.Printf("Enfileirando %d...\n", otherId)
 				requestQueue = append(requestQueue, otherId)
+				fmt.Println("Status da fila:", requestQueue)
 			} else {
 				//dar reply para otherId
-				fmt.Println("reply immediatly")
+				fmt.Println("Não tenho preferência...")
 				msg := "REPLY: reply from [" + strconv.Itoa(myId) + "] - "
 				msg += "logical clock: " + strconv.FormatUint(myLogicalClock, 10)
 				buf := []byte(msg)
@@ -105,14 +138,27 @@ func doServerJob() {
 				if err != nil {
 					fmt.Println(msg, err)
 				}
+
+				fmt.Printf("REPLY enviado para %d\n", otherId)
 			}
 		} else if strings.Contains(message, "REPLY:") {
+			//obter id do outro processo
+			idxId := strings.Index(message, "[")
+			otherIdStr := message[idxId+1 : idxId+2]
+			otherId, _ := strconv.Atoi(otherIdStr)
+
+			//obter logical clock do outro processo
 			idxClock := strings.Index(message, "logical clock: ") + len("logical clock: ")
 			msgLogicalClockStr := message[idxClock:]
 			msgLogicalClock, _ := strconv.ParseUint(msgLogicalClockStr, 10, 64)
 			myLogicalClock = Max(myLogicalClock, msgLogicalClock) + 1
+
 			repliesCount++
-			fmt.Printf("REPLY RECEBIDO! Logical clock updated to: %d\n", myLogicalClock)
+			fmt.Printf("REPLY %d RECEBIDO de %d! Logical clock updated to: %d\n", repliesCount, otherId, myLogicalClock)
+
+			if repliesCount == nServers-1 {
+				go accessCS()
+			}
 		} else {
 			//recebeu uma mensagem qualquer de um processo
 			idx := strings.Index(message, "logical clock: ") + len("logical clock: ")
@@ -144,10 +190,10 @@ func doClientJob(otherProcessId int) {
 	if otherProcessId == sharedResourceId && myState == RELEASED {
 		//avisar outros processos que quero acessar a CS
 		myState = WANTED
+		fmt.Println("Agora estou em WANTED")
 		repliesCount = 0
 		requestQueue = nil
 		myLogicalClock++
-		fmt.Printf("REQUEST ENVIADO! Logical clock updated to: %d\n", myLogicalClock)
 		broadcastMsg := "REQUEST: Process [" + myIdStr + "] WANTs to enter CS! "
 		broadcastMsg += "Logical clock: " + strconv.FormatUint(myLogicalClock, 10)
 		buf2 := []byte(broadcastMsg)
@@ -159,6 +205,7 @@ func doClientJob(otherProcessId int) {
 				}
 			}
 		}
+		fmt.Printf("REQUEST EM BROADCAST ENVIADO! Logical clock updated to: %d\n", myLogicalClock)
 	}
 
 	time.Sleep(time.Second * 1)
