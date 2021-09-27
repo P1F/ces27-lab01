@@ -23,6 +23,7 @@ var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo mens
 var myState string                  //define o estado do processo
 var myRequestQueue []int            //define a fila para guardar requests
 var myRepliesCount int              //define um contador de replies
+var myRequestMessage string         //armazena a mensagem quando o processo entra em WANTED
 var requestTimestamp uint64         //armazena o logical clock depois de ter enviado o broadcast
 const sharedResourceId int = 0      //define um id fixo para o SharedResource
 
@@ -69,26 +70,39 @@ func accessCS(mutex *sync.Mutex) {
 	myState = HELD
 	mutex.Unlock()
 	fmt.Println("Agora estou em HELD")
+
+	myIdStr := strconv.Itoa(myId)
+
+	//enviar mensagem para Shared Resource
+	msg := "Message received from id [" + myIdStr + "] -> "
+	msg += "msg: " + myRequestMessage + " - logical clock: " + strconv.FormatUint(myLogicalClock, 10)
+	buf := []byte(msg)
+	_, err := CliConn[ports[sharedResourceId]].Write(buf)
+	if err != nil {
+		fmt.Println(msg, err)
+	}
+
 	//dormir por 2s (só para simular quando sair da CS)
 	time.Sleep(time.Second * 20)
+	fmt.Println("Trabalhando...")
 
 	//sair da CS -> trocar estado para RELEASED
 	mutex.Lock()
 	myState = RELEASED
 	mutex.Unlock()
-	fmt.Println("Agora estou em RELEASED")
 	fmt.Println("Saí da CS")
+	fmt.Println("Agora estou em RELEASED")
 
 	//preparar mensagem de reply
-	msg := "REPLY: reply from [" + strconv.Itoa(myId) + "] - "
-	msg += "logical clock: " + strconv.FormatUint(myLogicalClock, 10)
-	buf := []byte(msg)
+	msg2 := "REPLY: reply from [" + myIdStr + "] - "
+	msg2 += "logical clock: " + strconv.FormatUint(myLogicalClock, 10)
+	buf2 := []byte(msg2)
 
 	//dar reply para todos os processos com requests enfileirados
 	for _, id := range myRequestQueue {
-		_, err := CliConn[ports[id]].Write(buf)
+		_, err := CliConn[ports[id]].Write(buf2)
 		if err != nil {
-			fmt.Println(msg, err)
+			fmt.Println(msg2, err)
 		}
 	}
 
@@ -99,6 +113,7 @@ func accessCS(mutex *sync.Mutex) {
 	myRepliesCount = 0
 	myRequestQueue = nil
 	requestTimestamp = 0
+	myRequestMessage = ""
 	mutex.Unlock()
 }
 
@@ -186,26 +201,17 @@ func doServerJob(mutex *sync.Mutex) {
 		if err != nil {
 			fmt.Println("Error: ", err)
 		}
-
-		/*quando for de HELD pra RELEASED, limpar a myRequestQueue e zerar
-		o contador de replies*/
 	}
 }
 
-func doClientJob(otherProcessId int, mutex *sync.Mutex) {
+func doClientJob(otherProcessId int, message string, mutex *sync.Mutex) {
 	// Enviar mensagem para outro processo contendo meu id e logical clock
-	myIdStr := strconv.Itoa(myId)
-	msg := "Hello! Here's my info -> "
-	msg += "id: " + myIdStr + " - logical clock: " + strconv.FormatUint(myLogicalClock, 10)
-	buf := []byte(msg)
-	_, err := CliConn[ports[otherProcessId]].Write(buf)
-	if err != nil {
-		fmt.Println(msg, err)
-	}
 
 	if otherProcessId == sharedResourceId && myState == RELEASED {
 		//avisar outros processos que quero acessar a CS
+		myIdStr := strconv.Itoa(myId)
 		mutex.Lock()
+		myRequestMessage = message
 		myState = WANTED
 		myRepliesCount = 0
 		myRequestQueue = nil
@@ -227,6 +233,8 @@ func doClientJob(otherProcessId int, mutex *sync.Mutex) {
 		requestTimestamp = myLogicalClock
 		mutex.Unlock()
 		fmt.Printf("REQUEST EM BROADCAST ENVIADO! Logical clock updated to: %d\n", myLogicalClock)
+	} else {
+		fmt.Printf("'%s' ignorado\n", message)
 	}
 
 	time.Sleep(time.Second * 1)
@@ -251,6 +259,7 @@ func initConnections() {
 	myRepliesCount = 0
 	myRequestQueue = nil
 	myState = RELEASED
+	myRequestMessage = ""
 	nServers = len(os.Args) - 2
 	//Esse 2 tira o nome (no caso Process) e o meu id. As demais portas são dos outros processos
 
@@ -308,18 +317,11 @@ func main() {
 			if valid {
 				fmt.Printf("Input received from keyboard: %s\n", x)
 				id, erro := strconv.Atoi(x)
-				if erro == nil {
-					if id != myId { // chame rotina para envio de mensagens
-						go doClientJob(id, &mutex)
-					} else {
-						myLogicalClock++
-						fmt.Printf("INTERNAL event! Logical clock updated to: %d\n", myLogicalClock)
-					}
+				if erro == nil && id == myId {
+					myLogicalClock++
+					fmt.Printf("INTERNAL event! Logical clock updated to: %d\n", myLogicalClock)
 				} else {
-					fmt.Printf("Input '%s' is not a number!\n", x)
-					if x == "clock" {
-						fmt.Printf("myClock -> %d\n", myLogicalClock)
-					}
+					go doClientJob(sharedResourceId, x, &mutex)
 				}
 			} else {
 				fmt.Println("Channel CLOSED!")
