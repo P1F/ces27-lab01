@@ -62,8 +62,8 @@ func readInput(ch chan string) {
 
 func accessCS(mutex *sync.Mutex) {
 	fmt.Println("Entrei na CS")
-	//entrar na CS -> trocar estado para HELD
 	mutex.Lock()
+	//entrar na CS -> trocar estado para HELD
 	myState = HELD
 	mutex.Unlock()
 	fmt.Println("Agora estou em HELD")
@@ -80,8 +80,8 @@ func accessCS(mutex *sync.Mutex) {
 	}
 
 	//dormir por 2s (só para simular quando sair da CS)
-	time.Sleep(time.Second * 20)
 	fmt.Println("Trabalhando...")
+	time.Sleep(time.Second * 20)
 
 	//sair da CS -> trocar estado para RELEASED
 	mutex.Lock()
