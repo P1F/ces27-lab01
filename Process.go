@@ -81,7 +81,7 @@ func accessCS(mutex *sync.Mutex) {
 
 	//dormir por 2s (só para simular quando sair da CS)
 	fmt.Println("Trabalhando...")
-	time.Sleep(time.Second * 20)
+	time.Sleep(time.Second * 3)
 
 	//sair da CS -> trocar estado para RELEASED
 	mutex.Lock()
