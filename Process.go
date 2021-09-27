@@ -23,6 +23,7 @@ var ServConn *net.UDPConn           //conexão do meu servidor (onde recebo mens
 var myState string                  //define o estado do processo
 var myRequestQueue []int            //define a fila para guardar requests
 var myRepliesCount int              //define um contador de replies
+var requestTimestamp uint64         //armazena o logical clock depois de ter enviado o broadcast
 const sharedResourceId int = 0      //define um id fixo para o SharedResource
 
 const RELEASED string = "RELEASED"
@@ -69,7 +70,7 @@ func accessCS(mutex *sync.Mutex) {
 	mutex.Unlock()
 	fmt.Println("Agora estou em HELD")
 	//dormir por 2s (só para simular quando sair da CS)
-	time.Sleep(time.Second * 60)
+	time.Sleep(time.Second * 20)
 
 	//sair da CS -> trocar estado para RELEASED
 	mutex.Lock()
@@ -97,6 +98,7 @@ func accessCS(mutex *sync.Mutex) {
 	mutex.Lock()
 	myRepliesCount = 0
 	myRequestQueue = nil
+	requestTimestamp = 0
 	mutex.Unlock()
 }
 
@@ -126,8 +128,8 @@ func doServerJob(mutex *sync.Mutex) {
 
 			isMyPreference := false
 			if myState == WANTED {
-				if (myLogicalClock < otherLogicalClock) ||
-					(myLogicalClock == otherLogicalClock && myId < otherId) {
+				if (requestTimestamp < otherLogicalClock) ||
+					(requestTimestamp == otherLogicalClock && myId < otherId) {
 					isMyPreference = true
 				}
 			}
@@ -221,6 +223,9 @@ func doClientJob(otherProcessId int, mutex *sync.Mutex) {
 				}
 			}
 		}
+		mutex.Lock()
+		requestTimestamp = myLogicalClock
+		mutex.Unlock()
 		fmt.Printf("REQUEST EM BROADCAST ENVIADO! Logical clock updated to: %d\n", myLogicalClock)
 	}
 
