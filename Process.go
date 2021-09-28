@@ -256,6 +256,7 @@ func initConnections() {
 	myId, _ = strconv.Atoi(os.Args[1])
 	myPort = ports[myId]
 	myLogicalClock = 0
+	requestTimestamp = 0
 	myRepliesCount = 0
 	myRequestQueue = nil
 	myState = RELEASED
