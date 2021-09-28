@@ -205,8 +205,6 @@ func doServerJob(mutex *sync.Mutex) {
 }
 
 func doClientJob(otherProcessId int, message string, mutex *sync.Mutex) {
-	// Enviar mensagem para outro processo contendo meu id e logical clock
-
 	if otherProcessId == sharedResourceId && myState == RELEASED {
 		//avisar outros processos que quero acessar a CS
 		myIdStr := strconv.Itoa(myId)
