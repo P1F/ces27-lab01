@@ -118,8 +118,8 @@ func accessCS(mutex *sync.Mutex) {
 }
 
 func doServerJob(mutex *sync.Mutex) {
+	buf := make([]byte, 1024)
 	for {
-		buf := make([]byte, 1024)
 		//Ler (uma vez somente) da conexão UDP a mensagem
 		n, _, err := ServConn.ReadFromUDP(buf)
 		//Escrever na tela a msg recebida (indicando o endereço de quem enviou)
